@@ -1,6 +1,8 @@
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const express = require('express');
 const cors = require('cors');
+const stripe = require("stripe")('sk_test_51OIDPJHroIJBMQjz3A9lmORO5EGCaqkQHolH9Cby0XJLoVl4DlciQxcfrb7vWIwYOikGnkMaQAggtVaxuvM3Mljo0000xqpHuw');
+
 const app = express()
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser')
@@ -19,7 +21,7 @@ app.use(cookieParser())
 require('dotenv').config()
 // Mongo
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.60qibw3.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://sakib01181:Sakib_22@cluster0.60qibw3.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -36,6 +38,35 @@ async function run() {
     const foodCollection = client.db('foodCollection').collection('food')
     const foodCart = client.db('foodCollection').collection('cart')
     const user = client.db('foodCollection').collection('user')
+    // Payment
+    app.post("/stripe-payment", async (req, res) => {
+      const { amount } = req.body;
+      const balance = amount
+    
+      try {
+        console.log(`Payment amount received: ${balance}`);
+        // Create a PaymentIntent with the order amount and currency
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: balance * 100, // Amount in cents
+          currency: "usd",
+          automatic_payment_methods: {
+            enabled: true,
+          },
+        });
+    
+        console.log(`PaymentIntent created: ${paymentIntent.id}`);
+        res.send({
+          clientSecret: paymentIntent.client_secret,
+        });
+      } catch (error) {
+        console.error(`Error creating PaymentIntent: ${error.message}`);
+        res.status(500).send({
+          error: error.message,
+        });
+      }
+    });
+    
+    
 
     app.get('/products-count', async (req, res) => {
       try {
@@ -53,7 +84,7 @@ async function run() {
       if (!token) {
         return res.status(401).send({ message: 'Unauthorized access' });
       }
-    
+
       jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
         if (err) {
           return res.status(401).send({ message: 'Unauthorized access' });
@@ -65,17 +96,17 @@ async function run() {
     };
 
     // JWT TOKEN
-    app.post('/jwt', (req, res)=> {
+    app.post('/jwt', (req, res) => {
       const user = req.body
       console.log(user);
-      const token = jwt.sign(user,process.env.ACCESS_TOKEN, {expiresIn : '5h'})
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN, { expiresIn: '5h' })
       res
-      .cookie('token',token,{
-        httpOnly : true,
-        secure : true,
-        sameSite : 'none',
-      })
-      .send({token})
+        .cookie('token', token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'none',
+        })
+        .send({ token })
     }
     )
     app.post('/logout', async (req, res) => {
@@ -96,12 +127,12 @@ async function run() {
 
 
     // Get All cart Data
-    app.get('/cart/:email',verifyToken, async (req, res) => {
+    app.get('/cart/:email', verifyToken, async (req, res) => {
       const email = req.params.email
       const user = req?.user?.user
-      console.log(email,user)
-      if(email !== user){
-        return res.status(401).send({message : 'unauthorize access'})
+      console.log(email, user)
+      if (email !== user) {
+        return res.status(401).send({ message: 'unauthorize access' })
       }
       const query = { loggedUser: email }
       const filter = foodCart.find(query)
@@ -113,8 +144,8 @@ async function run() {
       const user = req?.user?.user
       const email = req.params.email
       console.log(user, email);
-      if(user !== email){
-        res.status(401).send({message : 'unauthorize access'})
+      if (user !== email) {
+        res.status(401).send({ message: 'unauthorize access' })
       }
       const query = { loggedUser: email }
       const filter = foodCollection.find(query)
@@ -200,7 +231,7 @@ async function run() {
         console.log(error);
       }
     })
-// Details id
+    // Details id
     app.get('/details/:id', async (req, res) => {
       try {
         const id = req.params.id
