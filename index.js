@@ -42,7 +42,7 @@ async function run() {
     app.post("/stripe-payment", async (req, res) => {
       const { amount } = req.body;
       const balance = amount
-    
+      console.log(balance);
       try {
         console.log(`Payment amount received: ${balance}`);
         // Create a PaymentIntent with the order amount and currency
