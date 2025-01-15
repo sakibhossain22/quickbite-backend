@@ -38,13 +38,13 @@ async function run() {
     const foodCollection = client.db('foodCollection').collection('food')
     const foodCart = client.db('foodCollection').collection('cart')
     const user = client.db('foodCollection').collection('user')
+    const payment = client.db('foodCollection').collection('payment')
     // Payment
     app.post("/stripe-payment", async (req, res) => {
       const { amount } = req.body;
+      const { foods } = req.body;
       const balance = amount
-      console.log(balance);
       try {
-        console.log(`Payment amount received: ${balance}`);
         // Create a PaymentIntent with the order amount and currency
         const paymentIntent = await stripe.paymentIntents.create({
           amount: balance * 100, // Amount in cents
@@ -53,8 +53,8 @@ async function run() {
             enabled: true,
           },
         });
-    
-        console.log(`PaymentIntent created: ${paymentIntent.id}`);
+        const result = await payment.insertOne({paymentIntent, foods,amount})
+        console.log(result);
         res.send({
           clientSecret: paymentIntent.client_secret,
         });
@@ -65,8 +65,8 @@ async function run() {
         });
       }
     });
-    
-    
+
+
 
     app.get('/products-count', async (req, res) => {
       try {
@@ -98,10 +98,11 @@ async function run() {
     // JWT TOKEN
     app.post('/jwt', (req, res) => {
       const user = req.body
+      console.log(process.env.ACCESS_TOKEN);
       console.log(user);
       const token = jwt.sign(user, process.env.ACCESS_TOKEN, { expiresIn: '5h' })
-      res
-        .cookie('token', token, {
+      console.log(token);
+      res.cookie('token', token, {
           httpOnly: true,
           secure: true,
           sameSite: 'none',
