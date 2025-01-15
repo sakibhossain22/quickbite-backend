@@ -67,19 +67,46 @@ async function run() {
 
 
     // Recent Act
-    app.get('/recent-activity:email', async (req, res) => {
+    app.get('/recent-activity', async (req, res) => {
       try {
-        const user = req?.query
-        const query = { user : user}
-        console.log(user);
-        const query2 = { loggedUser : user}
-       const result = await payment.find(query).sort({ createdAt: -1 }).limit(10).toArray()
-       const filterProduct = await foodCollection.find(query2).toArray()
-       res.send({result, filterProduct})
+        // Extract user email from query parameters
+        const { user } = req.query;
+
+        // Validate query parameter
+        if (!user) {
+          return res.status(400).send({ message: "User email is required" });
+        }
+
+        // MongoDB queries
+        const paymentQuery = { user: user }; // Query for payment data
+        const foodQuery = { loggedUser: user }; // Query for food data
+
+        // Fetch data from collections
+        const paymentResults = await payment
+          .find(paymentQuery)
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .toArray();
+
+        const foodResults = await foodCollection
+          .find(foodQuery)
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .toArray();
+
+        // Combine both arrays and sort by 'createdAt' in descending order
+        const combinedResults = [...paymentResults, ...foodResults].sort((a, b) => {
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+
+        // Send the combined and sorted data as response
+        res.send(combinedResults);
       } catch (error) {
-        console.log(error);
+        console.error("Error fetching recent activity:", error);
+        res.status(500).send({ message: "Internal Server Error" });
       }
-    })
+    });
+
     app.get('/products-count', async (req, res) => {
       try {
         const count = await foodCollection.estimatedDocumentCount()
