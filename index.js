@@ -39,10 +39,12 @@ async function run() {
     const foodCart = client.db('foodCollection').collection('cart')
     const user = client.db('foodCollection').collection('user')
     const payment = client.db('foodCollection').collection('payment')
+
     // Payment
     app.post("/stripe-payment", async (req, res) => {
       const { amount } = req.body;
       const { foods } = req.body;
+      const { user } = req.body;
       const balance = amount
       try {
         // Create a PaymentIntent with the order amount and currency
@@ -53,11 +55,8 @@ async function run() {
             enabled: true,
           },
         });
-        const result = await payment.insertOne({paymentIntent, foods,amount})
-        console.log(result);
-        res.send({
-          clientSecret: paymentIntent.client_secret,
-        });
+        const result = await payment.insertOne({ paymentIntent, foods, user })
+        res.send(paymentIntent);
       } catch (error) {
         console.error(`Error creating PaymentIntent: ${error.message}`);
         res.status(500).send({
@@ -67,7 +66,20 @@ async function run() {
     });
 
 
-
+    // Recent Act
+    app.get('/recent-activity:email', async (req, res) => {
+      try {
+        const user = req?.query
+        const query = { user : user}
+        console.log(user);
+        const query2 = { loggedUser : user}
+       const result = await payment.find(query).sort({ createdAt: -1 }).limit(10).toArray()
+       const filterProduct = await foodCollection.find(query2).toArray()
+       res.send({result, filterProduct})
+      } catch (error) {
+        console.log(error);
+      }
+    })
     app.get('/products-count', async (req, res) => {
       try {
         const count = await foodCollection.estimatedDocumentCount()
@@ -79,7 +91,6 @@ async function run() {
     //  verify Token
     const verifyToken = (req, res, next) => {
       const token = req?.cookies?.token;
-      console.log('Cookie Value:', token);
 
       if (!token) {
         return res.status(401).send({ message: 'Unauthorized access' });
@@ -89,7 +100,6 @@ async function run() {
         if (err) {
           return res.status(401).send({ message: 'Unauthorized access' });
         }
-        console.log(decoded);
         req.user = decoded;
       });
       next();
@@ -98,15 +108,12 @@ async function run() {
     // JWT TOKEN
     app.post('/jwt', (req, res) => {
       const user = req.body
-      console.log(process.env.ACCESS_TOKEN);
-      console.log(user);
       const token = jwt.sign(user, process.env.ACCESS_TOKEN, { expiresIn: '5h' })
-      console.log(token);
       res.cookie('token', token, {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'none',
-        })
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+      })
         .send({ token })
     }
     )
@@ -131,7 +138,6 @@ async function run() {
     app.get('/cart/:email', verifyToken, async (req, res) => {
       const email = req.params.email
       const user = req?.user?.user
-      console.log(email, user)
       if (email !== user) {
         return res.status(401).send({ message: 'unauthorize access' })
       }
@@ -144,7 +150,6 @@ async function run() {
     app.get('/update/:email', verifyToken, async (req, res) => {
       const user = req?.user?.user
       const email = req.params.email
-      console.log(user, email);
       if (user !== email) {
         res.status(401).send({ message: 'unauthorize access' })
       }
@@ -184,8 +189,6 @@ async function run() {
     app.post('/order', async (req, res) => {
       try {
         const data = req.body
-        console.log(req?.user?.user);
-        console.log(data.loggedUser);
         // if(req.user.user !== data.loggedUser ){
         //   return res.status(403).send('forbidden access')
         // }
@@ -215,7 +218,6 @@ async function run() {
     })
     // Add Product 
     app.post('/addproduct', async (req, res) => {
-      console.log(req.cookies)
       const data = req.body
       const result = await foodCollection.insertOne(data)
       res.send(result)
