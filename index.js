@@ -65,7 +65,19 @@ async function run() {
       }
     });
 
+    // total payment
+    app.get("/total-payment", async (req, res) => {
+      try {
+        const { user } = req.query
+        const query = {user : user}
+        const result = await payment.find(query).toArray()
+        const total = result.reduce((acc, curr) => acc + curr.paymentIntent.amount)
+        console.log(total);
+      }
+      catch {
 
+      }
+    })
     // Recent Act
     app.get('/recent-activity', async (req, res) => {
       try {
